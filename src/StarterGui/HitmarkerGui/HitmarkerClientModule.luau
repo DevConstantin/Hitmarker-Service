@@ -12,8 +12,9 @@ local hitmarkerGui = script.Parent
 local templatesFolder = hitmarkerGui.HitmarkerTemplates
 local hitmarkerImageTemplate = templatesFolder.HitmarkerImage
 local hitmarkerSoundTemplate = templatesFolder.HitmarkerSound
+local KOSoundTemplate = templatesFolder.KOSound
 local hitmarkerContainer = hitmarkerGui.HitmarkersContainer -- Stores cloned hitmarker instances
-
+-- Screen effects
 local defaultColorCorrection = Lighting:WaitForChild("ColorCorrection")
 local koColorCorrection = Lighting:WaitForChild("KO_ColorCorrection") -- Used for KO effect
 local koBlur = Lighting:WaitForChild("KO_Blur")
@@ -31,9 +32,7 @@ local CC_CONTRAST = koColorCorrection.Brightness
 local CC_SATURATION = koColorCorrection.Brightness
 
 local tweenInfo = TweenInfo.new(HITMARKER_FADE_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
 local koEffectTweenInfo = TweenInfo.new(KO_BLUR_T, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false)
-
 local knockoutBlurTween = TweenService:Create(koBlur, koEffectTweenInfo, { Size = 0 })
 
 -- // VARIABLES
@@ -42,12 +41,83 @@ local currentCCTween, ccTweenCompletedConnect = nil
 
 -- // FUNCTIONS
 
-local function inCinematicMode()
+-- Function to show the hitmarker
+function HitmarkerModule.ShowHitmarker(applyKOEffect: boolean?)
+	if HitmarkerModule.InCinematicMode() then
+		return
+	end
+
+	-- Cooldown to prevent hitmarker spam (for abilities that do damage with a loop and such)
+	if (os.clock() - lastHitmarkerTime) < HITMARKER_COOLDOWN then
+		return
+	end
+	lastHitmarkerTime = os.clock()
+
+	-- Clone image template, position it at cursor, & parent
+	local newHitmarkerImage = hitmarkerImageTemplate:Clone()
+	local mouseLocation = UserInputService:GetMouseLocation()
+
+	if applyKOEffect then
+		newHitmarkerImage.ImageColor3 = Color3.fromRGB(255, 16, 20)
+	end
+	newHitmarkerImage.Position = UDim2.new(0, mouseLocation.X, 0, mouseLocation.Y)
+	newHitmarkerImage.Visible = true
+	newHitmarkerImage.Parent = hitmarkerContainer
+
+	-- Sound is optional
+	if USE_SOUND then
+		-- Create, parent, and play sound
+		local newHitmarkerSound = (applyKOEffect and KOSoundTemplate or hitmarkerSoundTemplate):Clone()
+		newHitmarkerSound.Parent = newHitmarkerImage -- Parent to image for easy cleanup
+		newHitmarkerSound:Play()
+	end
+
+	HitmarkerModule.RunKOEffect(applyKOEffect)
+
+	local runServiceConnect = nil -- Used to attach hitmarker image to mouse position
+
+	-- Animate & cleanup (fade out)
+	task.delay(HITMARKER_VISIBLE_DURATION, function()
+		if not newHitmarkerImage or not newHitmarkerImage.Parent then
+			return
+		end -- Check if already somehow destroyed
+
+		local tween = TweenService:Create(
+			newHitmarkerImage,
+			tweenInfo,
+			{ ImageTransparency = 1, Size = UDim2.new(0.07, 0, 0.135, 0) }
+		)
+
+		tween.Completed:Connect(function()
+			if newHitmarkerImage and newHitmarkerImage.Parent then
+				if runServiceConnect then
+					runServiceConnect:Disconnect()
+				end
+				newHitmarkerImage:Destroy()
+			end
+		end)
+
+		tween:Play()
+	end)
+
+	-- Attach hitmarker to mouse position
+	runServiceConnect = RunService.Heartbeat:Connect(function()
+		if newHitmarkerImage and newHitmarkerImage.Parent then
+			print("Updating hitmarker position!")
+			mouseLocation = UserInputService:GetMouseLocation()
+			newHitmarkerImage.Position = UDim2.new(0, mouseLocation.X, 0, mouseLocation.Y)
+		else
+			runServiceConnect:Disconnect()
+		end
+	end)
+end
+
+function HitmarkerModule.InCinematicMode()
 	local cinematicModeStyle = Lighting:GetAttribute("CinematicModeStyle")
 	return cinematicModeStyle == "Enabled" or cinematicModeStyle == "Black_Bars"
 end
 
-local function runKOEffect(applyKOEffect)
+function HitmarkerModule.RunKOEffect(applyKOEffect)
 	if not applyKOEffect then
 		return
 	end
@@ -90,77 +160,7 @@ local function runKOEffect(applyKOEffect)
 	end
 end
 
--- Function to show the hitmarker
-function HitmarkerModule.ShowHitmarker(applyKOEffect)
-	if inCinematicMode() then
-		return
-	end
-
-	-- Cooldown to prevent hitmarker spam (for abilities that do damage with a loop and such)
-	if (os.clock() - lastHitmarkerTime) < HITMARKER_COOLDOWN then
-		return
-	end
-	lastHitmarkerTime = os.clock()
-
-	-- Clone image template, position it at cursor, & parent
-	local newHitmarkerImage = hitmarkerImageTemplate:Clone()
-	local mouseLocation = UserInputService:GetMouseLocation()
-
-	if applyKOEffect then
-		newHitmarkerImage.ImageColor3 = Color3.fromRGB(255, 16, 20)
-	end
-	newHitmarkerImage.Position = UDim2.new(0, mouseLocation.X, 0, mouseLocation.Y)
-	newHitmarkerImage.Visible = true
-	newHitmarkerImage.Parent = hitmarkerContainer
-
-	-- Sound is optional
-	if USE_SOUND then
-		-- Create, parent, and play sound
-		local newHitmarkerSound = hitmarkerSoundTemplate:Clone()
-		newHitmarkerSound.Parent = newHitmarkerImage -- Parent to image for easy cleanup
-		newHitmarkerSound:Play()
-	end
-
-	runKOEffect(applyKOEffect)
-
-	local runServiceConnect = nil -- Used to attach hitmarker image to mouse position
-
-	-- Animate & cleanup (fade out)
-	task.delay(HITMARKER_VISIBLE_DURATION, function()
-		if not newHitmarkerImage or not newHitmarkerImage.Parent then
-			return
-		end -- Check if already somehow destroyed
-
-		local tween = TweenService:Create(
-			newHitmarkerImage,
-			tweenInfo,
-			{ ImageTransparency = 1, Size = UDim2.new(0.07, 0, 0.135, 0) }
-		)
-
-		tween.Completed:Connect(function()
-			if newHitmarkerImage and newHitmarkerImage.Parent then
-				if runServiceConnect then
-					runServiceConnect:Disconnect()
-				end
-				newHitmarkerImage:Destroy()
-			end
-		end)
-
-		tween:Play()
-	end)
-
-	-- Attach hitmarker to mouse position
-	runServiceConnect = RunService.Heartbeat:Connect(function()
-		if newHitmarkerImage and newHitmarkerImage.Parent then
-			print("Updating hitmarker position!")
-			mouseLocation = UserInputService:GetMouseLocation()
-			newHitmarkerImage.Position = UDim2.new(0, mouseLocation.X, 0, mouseLocation.Y)
-		else
-			runServiceConnect:Disconnect()
-		end
-	end)
-end
-
+-- Initialize instances just in case
 if hitmarkerImageTemplate.Visible then
 	hitmarkerImageTemplate.Visible = false
 end
