@@ -21,7 +21,7 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- // OBJECTS
-local HitmarkerModule = require(script.Parent.HitmarkerModule)
+local HitmarkerClientModule = require(script.Parent.HitmarkerClientModule)
 local hitmarkerEvent = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("HitmarkerEvent")
 
 -- Example client usage. Show hitmarker on left mouse click
@@ -33,10 +33,10 @@ if script:GetAttribute("DevMode") then
 
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			print("Showing hitmarker via mouse click.")
-			HitmarkerModule.ShowHitmarker()
+			HitmarkerClientModule.ShowHitmarker()
 		end
 	end)
 end
 
 -- Show hitmarker from server
-hitmarkerEvent.OnClientEvent:Connect(HitmarkerModule.ShowHitmarker)
+hitmarkerEvent.OnClientEvent:Connect(HitmarkerClientModule.ShowHitmarker)
