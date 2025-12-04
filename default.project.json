@@ -20,6 +20,12 @@
       "$className": "StarterGui",
       "$ignoreUnknownInstances": true,
       "$path": "src/StarterGui"
+    },
+
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "$ignoreUnknownInstances": true,
+      "$path": "src/StarterPlayer"
     }
   }
 }
